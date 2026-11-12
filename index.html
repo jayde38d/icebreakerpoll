@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icebreaker Poll</title>
+<style>
+  :root {
+    --bg: #0f1226;
+    --panel: #181c3a;
+    --text: #f4f5fb;
+    --muted: #a3a8c9;
+    --a: #ff7a59;      /* option A colour */
+    --b: #3fc1c9;      /* option B colour */
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(circle at 20% 0%, #252a5a 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  button { font: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* fade transition for each question */
+  .stage { transition: opacity .6s ease, transform .6s ease; }
+  .stage.out { opacity: 0; transform: translateY(14px) scale(.98); }
+
+  /* ---------- SETUP ---------- */
+  #setup { max-width: 760px; margin: 6vh auto; padding: 0 24px; width: 100%; }
+  #setup h1 { font-size: 2.2rem; margin: 0 0 .3em; }
+  #setup p { color: var(--muted); line-height: 1.5; }
+  #setup textarea {
+    width: 100%; min-height: 300px; border-radius: 12px; border: 1px solid #343a6b;
+    background: var(--panel); color: var(--text); padding: 14px; font: 15px/1.6 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .primary {
+    background: linear-gradient(90deg, var(--a), #ff5c8a); color: #fff; border: 0;
+    padding: 14px 30px; border-radius: 999px; font-size: 1.15rem; font-weight: 700; margin-top: 18px;
+  }
+  .ghost {
+    background: transparent; color: var(--text); border: 1px solid #3c4277;
+    padding: 10px 20px; border-radius: 999px;
+  }
+  .ghost:hover { background: #22274d; }
+
+  /* ---------- HOST ---------- */
+  #host { flex: 1; display: flex; flex-direction: column; padding: 28px 48px 24px; }
+  .joinbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: var(--panel); border-radius: 999px; padding: 10px 12px 10px 22px; align-self: center;
+    font-size: 1.05rem;
+  }
+  .joinbar code { color: #ffd166; font-size: 1rem; word-break: break-all; }
+  .hostmain { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .qnum { color: var(--muted); letter-spacing: .15em; text-transform: uppercase; font-size: .95rem; }
+  .question { font-size: clamp(2.2rem, 5.5vw, 4.6rem); font-weight: 800; text-align: center; margin: .25em 0 .7em; line-height: 1.1; }
+  .chart { width: min(1100px, 92vw); display: grid; gap: 26px; }
+  .row { display: grid; grid-template-columns: minmax(140px, 26%) 1fr; align-items: center; gap: 20px; }
+  .label { font-size: clamp(1.2rem, 2.4vw, 2rem); font-weight: 700; text-align: right; }
+  .track { position: relative; height: 74px; background: #20254a; border-radius: 14px; overflow: hidden; }
+  .bar {
+    height: 100%; width: 0%; border-radius: 14px;
+    transition: width .7s cubic-bezier(.2,.9,.25,1.15);
+  }
+  .bar.a { background: var(--a); }
+  .bar.b { background: var(--b); }
+  .val {
+    position: absolute; top: 0; bottom: 0; left: 18px; display: flex; align-items: center;
+    font-size: 1.6rem; font-weight: 800; text-shadow: 0 1px 4px rgba(0,0,0,.4);
+  }
+  .total { margin-top: 26px; color: var(--muted); font-size: 1.2rem; }
+  .pop { animation: pop .35s ease; }
+  @keyframes pop { 50% { transform: scale(1.18); } }
+  .controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .controls .hint { color: var(--muted); font-size: .9rem; }
+
+  /* ---------- VOTER ---------- */
+  #voter { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; text-align: center; }
+  #voter .question { font-size: clamp(1.8rem, 7vw, 3rem); }
+  .choices { display: grid; gap: 18px; width: min(520px, 100%); }
+  .choice {
+    border: 3px solid transparent; border-radius: var(--radius); padding: 26px 18px;
+    font-size: clamp(1.3rem, 5vw, 1.8rem); font-weight: 800; color: #fff;
+    transition: transform .15s ease, opacity .3s ease, border-color .2s;
+  }
+  .choice:active { transform: scale(.97); }
+  .choice.a { background: var(--a); }
+  .choice.b { background: var(--b); }
+  .choices.voted .choice { opacity: .4; }
+  .choices.voted .choice.picked { opacity: 1; border-color: #fff; }
+  .status { margin-top: 22px; color: var(--muted); min-height: 1.5em; font-size: 1.05rem; }
+  .waiting { color: var(--muted); font-size: 1.3rem; }
+  .dot { display: inline-block; animation: blink 1.4s infinite; }
+  .dot:nth-child(2) { animation-delay: .2s } .dot:nth-child(3) { animation-delay: .4s }
+  @keyframes blink { 0%,80%,100% { opacity: .2 } 40% { opacity: 1 } }
+  .conn { position: fixed; bottom: 10px; right: 14px; font-size: .8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ================= SETUP (host only) ================= -->
+<section id="setup" class="hidden">
+  <h1>🎉 Icebreaker Poll</h1>
+  <p>One question per line, written as <b>Question | Answer 1 | Answer 2</b>. Edit as you like, then press Start.
+     Nobody needs to log in, and no names or emails are collected.</p>
+  <textarea id="qtext" spellcheck="false"></textarea>
+  <button class="primary" id="startBtn">Start the poll ▶</button>
+</section>
+
+<!-- ================= HOST SCREEN (screenshare this) ================= -->
+<section id="host" class="hidden">
+  <div class="joinbar">
+    <span>🗳️ Vote at</span><code id="joinUrl"></code>
+    <button class="ghost" id="copyBtn">Copy link</button>
+  </div>
+
+  <div class="hostmain">
+    <div class="stage" id="hostStage">
+      <div class="qnum" id="hQnum" style="text-align:center"></div>
+      <div class="question" id="hQuestion"></div>
+      <div class="chart" id="chart">
+        <div class="row">
+          <div class="label" id="hLabelA"></div>
+          <div class="track"><div class="bar a" id="barA"></div><div class="val" id="valA"></div></div>
+        </div>
+        <div class="row">
+          <div class="label" id="hLabelB"></div>
+          <div class="track"><div class="bar b" id="barB"></div><div class="val" id="valB"></div></div>
+        </div>
+      </div>
+      <div class="total" id="hTotal" style="text-align:center"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">◀ Back</button>
+    <span class="hint">Press → or Space for the next question · <a href="#" id="editLink" style="color:inherit">edit questions</a></span>
+    <button class="ghost" id="nextBtn">Next ▶</button>
+  </div>
+</section>
+
+<!-- ================= VOTER SCREEN ================= -->
+<section id="voter" class="hidden">
+  <div class="stage" id="voterStage">
+    <div id="vWaiting" class="waiting">Waiting for the host<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+    <div id="vPoll" class="hidden">
+      <div class="question" id="vQuestion"></div>
+      <div class="choices" id="choices">
+        <button class="choice a" data-c="0" id="vA"></button>
+        <button class="choice b" data-c="1" id="vB"></button>
+      </div>
+      <div class="status" id="vStatus">Tap your answer</div>
+    </div>
+    <div id="vEnd" class="hidden">
+      <div class="question">That's all, thanks for playing! 👋</div>
+    </div>
+  </div>
+</section>
+<div class="conn" id="conn"></div>
+
+<script>
+/*
+ * HOW IT WORKS
+ * - The host's screen and every voter's phone/laptop talk through ntfy.sh, a free,
+ *   no-login message relay. Each poll session uses a random, unguessable channel name.
+ * - Messages are tiny and anonymous: e.g. {"t":"v","q":2,"c":1}  ("question 2, answer B").
+ *   No names, emails, device IDs or cookies are ever created or sent.
+ * - "cache=no" tells ntfy.sh not to store messages; they are only passed on live.
+ * - Votes are tallied in memory on the host's screen only and vanish when the tab closes.
+ */
+const RELAY = new URLSearchParams(location.search).get("relay") || "https://ntfy.sh";
+
+const DEFAULT_QUESTIONS = `Introvert or extravert? | Introvert | Extravert
+Monarchy: yay or nay? | Yay | Nay
+Hot temper or cool temper? | Hot | Cool
+Horoscopes: | Scarily accurate | Scary anyone believes them
+Early bird or night owl? | Early bird | Night owl`;
+
+const $ = id => document.getElementById(id);
+const hashRoom = new URLSearchParams(location.hash.slice(1)).get("r");
+
+/* ---------- relay helpers ---------- */
+function publish(room, obj) {
+  return fetch(`${RELAY}/${room}?cache=no&firebase=no`, {
+    method: "POST", body: JSON.stringify(obj), keepalive: true
+  }).catch(() => {});
+}
+function subscribe(room, onMsg, onOpen) {
+  const es = new EventSource(`${RELAY}/${room}/sse`);
+  es.onmessage = e => {
+    try {
+      const env = JSON.parse(e.data);
+      if (env.event && env.event !== "message") return;
+      onMsg(JSON.parse(env.message));
+    } catch (_) {}
+  };
+  es.onopen = () => { $("conn").textContent = "● connected"; onOpen && onOpen(); };
+  es.onerror = () => { $("conn").textContent = "○ reconnecting…"; };
+  return es;
+}
+function fade(stageEl, update) {
+  stageEl.classList.add("out");
+  setTimeout(() => { update(); stageEl.classList.remove("out"); }, 600);
+}
+
+/* ======================= VOTER ======================= */
+/* Voters move themselves on: after each vote they go straight to the next question.
+ * If the host's screen gets ahead of someone, they jump forward to catch up. */
+function startVoter(room) {
+  $("voter").classList.remove("hidden");
+  let questions = null;   // full list, sent by the host
+  let pos = null;         // index of the question this person is looking at
+  let finished = false;
+  let busy = false;       // ignore taps during the short "got it" moment
+
+  function showEnd(text) {
+    finished = true;
+    fade($("voterStage"), () => {
+      $("vWaiting").classList.add("hidden"); $("vPoll").classList.add("hidden");
+      $("vEnd").classList.remove("hidden");
+      $("vEnd").querySelector(".question").textContent = text;
+    });
+  }
+  function showQuestion(i, q) {
+    const first = pos === null;
+    pos = i; finished = false; busy = false;
+    const render = () => {
+      $("vWaiting").classList.add("hidden"); $("vEnd").classList.add("hidden"); $("vPoll").classList.remove("hidden");
+      $("vQuestion").textContent = q.text;
+      $("vA").textContent = q.a; $("vB").textContent = q.b;
+      $("choices").classList.remove("voted");
+      $("vA").classList.remove("picked"); $("vB").classList.remove("picked");
+      $("vStatus").textContent = questions ? `Question ${i + 1} of ${questions.length}` : "Tap your answer";
+    };
+    first ? render() : fade($("voterStage"), render);
+  }
+
+  function onState(s) {
+    if (s.all) questions = s.all.map(([text, a, b]) => ({ text, a, b }));
+    if (s.end) { if (!finished || pos !== null) { pos = null; showEnd("That's all, thanks for playing! 👋"); } return; }
+    // Start at the host's question, or catch up if the host has moved past us.
+    if (pos === null || s.q > pos) showQuestion(s.q, { text: s.text, a: s.a, b: s.b });
+  }
+
+  document.querySelectorAll(".choice").forEach(btn => btn.addEventListener("click", () => {
+    if (busy || pos === null || finished) return;
+    busy = true;
+    const c = +btn.dataset.c;
+    publish(room, { t: "v", q: pos, c });
+    $("choices").classList.add("voted");
+    $("vA").classList.toggle("picked", c === 0);
+    $("vB").classList.toggle("picked", c === 1);
+    $("vStatus").textContent = "✅ Got it!";
+    setTimeout(() => {
+      if (questions && pos + 1 < questions.length) showQuestion(pos + 1, questions[pos + 1]);
+      else if (questions) showEnd("All done! 🎉 Watch the shared screen for the results.");
+      else $("vStatus").textContent = "✅ Vote counted! The next question will appear shortly.";
+    }, 600);
+  }));
+
+  subscribe(room, msg => { if (msg.t === "s") onState(msg); },
+                  () => publish(room, { t: "h" }));   // "hello": ask host for the questions
+}
+
+/* ======================= HOST ======================= */
+function parseQuestions(txt) {
+  return txt.split("\n").map(l => l.split("|").map(x => x.trim()))
+    .filter(p => p.length >= 3 && p[0] && p[1] && p[2])
+    .map(([text, a, b]) => ({ text, a, b }));
+}
+
+function startSetup() {
+  $("setup").classList.remove("hidden");
+  // Use edits saved in this browser, unless the questions built into the file have changed since.
+  let saved = null;
+  try { if (localStorage.getItem("icebreaker-defaults") === DEFAULT_QUESTIONS) saved = localStorage.getItem("icebreaker-questions"); } catch (_) {}
+  $("qtext").value = saved || DEFAULT_QUESTIONS;
+  $("startBtn").onclick = () => {
+    const qs = parseQuestions($("qtext").value);
+    if (!qs.length) return alert("Add at least one line like:  Tea or coffee? | Tea | Coffee");
+    try {   // host's own browser only
+      localStorage.setItem("icebreaker-questions", $("qtext").value);
+      localStorage.setItem("icebreaker-defaults", DEFAULT_QUESTIONS);
+    } catch (_) {}
+    $("setup").classList.add("hidden");
+    startHost(qs);
+  };
+}
+
+let hostStarted = false;
+function startHost(questions) {
+  $("host").classList.remove("hidden");
+  // Reuse the same room if the host refreshes, so the shared link keeps working.
+  let room = sessionStorage.getItem("icebreaker-room");
+  if (!room) {
+    room = "icebreaker-" + Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, "0")).join("");
+    sessionStorage.setItem("icebreaker-room", room);
+  }
+  const relayPart = RELAY === "https://ntfy.sh" ? "" : `?relay=${encodeURIComponent(RELAY)}`;
+  const joinUrl = location.origin + location.pathname + relayPart + "#r=" + room;
+  $("joinUrl").textContent = joinUrl;
+  $("copyBtn").onclick = async () => {
+    try { await navigator.clipboard.writeText(joinUrl); $("copyBtn").textContent = "Copied ✓"; }
+    catch { prompt("Copy this link:", joinUrl); }
+    setTimeout(() => $("copyBtn").textContent = "Copy link", 1800);
+  };
+
+  const counts = questions.map(() => [0, 0]);
+  let idx = 0;
+  let ended = false;
+
+  // Send the full list so voters can move on by themselves. Kept small so the relay
+  // passes it on directly (very long lists fall back to following the host's screen).
+  const all = questions.map(q => [q.text, q.a, q.b]);
+  const allFits = JSON.stringify(all).length < 3500;
+  const state = () => ended ? { t: "s", end: true }
+    : Object.assign({ t: "s", q: idx, text: questions[idx].text, a: questions[idx].a, b: questions[idx].b },
+                    allFits ? { all } : {});
+  const broadcast = () => publish(room, state());
+
+  function renderChart() {
+    const [a, b] = counts[idx], tot = a + b;
+    const pa = tot ? Math.round(a / tot * 100) : 0, pb = tot ? 100 - pa : 0;
+    $("barA").style.width = pa + "%"; $("barB").style.width = pb + "%";
+    $("valA").textContent = tot ? `${a}  ·  ${pa}%` : "0";
+    $("valB").textContent = tot ? `${b}  ·  ${pb}%` : "0";
+    $("hTotal").textContent = tot === 1 ? "1 vote" : `${tot} votes`;
+  }
+  function renderQuestion() {
+    if (ended) {
+      $("hQnum").textContent = ""; $("hQuestion").textContent = "That's a wrap! 🎉";
+      $("chart").classList.add("hidden"); $("hTotal").textContent = ""; return;
+    }
+    $("chart").classList.remove("hidden");
+    $("hQnum").textContent = `Question ${idx + 1} of ${questions.length}`;
+    $("hQuestion").textContent = questions[idx].text;
+    $("hLabelA").textContent = questions[idx].a; $("hLabelB").textContent = questions[idx].b;
+    renderChart();
+  }
+  function go(delta) {
+    if (ended && delta < 0) { ended = false; }
+    else if (idx + delta >= questions.length) { if (ended) return; ended = true; }
+    else if (idx + delta < 0) return;
+    else idx += delta;
+    fade($("hostStage"), renderQuestion);
+    broadcast();
+  }
+
+  renderQuestion();
+  $("nextBtn").onclick = () => go(1);
+  $("prevBtn").onclick = () => go(-1);
+  $("editLink").onclick = e => {
+    e.preventDefault();
+    if (confirm("Go back to editing questions? Current vote counts will be cleared.")) location.reload();
+  };
+  if (!hostStarted) {
+    hostStarted = true;
+    document.addEventListener("keydown", e => {
+      if (e.target.tagName === "TEXTAREA") return;
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); go(1); }
+      if (e.key === "ArrowLeft") go(-1);
+    });
+  }
+
+  // Answer late joiners quickly, but batch requests so we don't spam the relay.
+  let helloTimer = null;
+  subscribe(room, msg => {
+    if (msg.t === "h") {
+      if (!helloTimer) helloTimer = setTimeout(() => { helloTimer = null; broadcast(); }, 1200);
+    } else if (msg.t === "v" && Number.isInteger(msg.q) && counts[msg.q] && (msg.c === 0 || msg.c === 1)) {
+      if (msg.p === 0 || msg.p === 1) counts[msg.q][msg.p] = Math.max(0, counts[msg.q][msg.p] - 1);
+      counts[msg.q][msg.c]++;
+      if (msg.q === idx && !ended) {
+        renderChart();
+        const el = msg.c === 0 ? $("valA") : $("valB");
+        el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+      }
+    }
+  }, broadcast);
+  setInterval(broadcast, 15000);   // gentle heartbeat in case anyone missed a change
+}
+
+/* ---------- route ---------- */
+if (hashRoom) startVoter(hashRoom); else startSetup();
+</script>
+</body>
+</html>
